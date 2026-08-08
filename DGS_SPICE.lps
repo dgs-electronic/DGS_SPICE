@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <Version Value="12"/>
+    <BuildModes Active="Default"/>
+    <Units>
+      <Unit>
+        <Filename Value="DGS_SPICE.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <TopLine Value="80"/>
+        <CursorPos X="9" Y="68"/>
+        <UsageCount Value="20"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="uParser.pas"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="174"/>
+        <CursorPos X="3" Y="136"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="uComponents.pas"/>
+        <EditorIndex Value="3"/>
+        <CursorPos X="3" Y="25"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="uCircuit.pas"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="57"/>
+        <CursorPos X="3" Y="73"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit>
+      <Unit>
+        <Filename Value="/usr/share/fpcsrc/3.2.2/packages/rtl-generics/src/generics.collections.pas"/>
+        <UnitName Value="Generics.Collections"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="37"/>
+        <UsageCount Value="10"/>
+      </Unit>
+    </Units>
+    <JumpHistory HistoryIndex="19">
+      <Position>
+        <Filename Value="DGS_SPICE.lpr"/>
+        <Caret TopLine="66"/>
+      </Position>
+      <Position>
+        <Filename Value="uParser.pas"/>
+        <Caret Line="11" Column="18"/>
+      </Position>
+      <Position>
+        <Filename Value="uParser.pas"/>
+        <Caret Line="144" Column="3" TopLine="167"/>
+      </Position>
+      <Position>
+        <Filename Value="DGS_SPICE.lpr"/>
+        <Caret TopLine="72"/>
+      </Position>
+      <Position>
+        <Filename Value="uParser.pas"/>
+        <Caret Line="11" Column="10"/>
+      </Position>
+      <Position>
+        <Filename Value="uParser.pas"/>
+        <Caret Line="189" Column="28" TopLine="171"/>
+      </Position>
+      <Position>
+        <Filename Value="uParser.pas"/>
+        <Caret Line="136" Column="3" TopLine="120"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="24" Column="21"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="54" Column="3" TopLine="37"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="14" Column="14"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="24" Column="22" TopLine="7"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="54" Column="3" TopLine="52"/>
+      </Position>
+      <Position>
+        <Filename Value="DGS_SPICE.lpr"/>
+        <Caret Line="102" Column="14" TopLine="78"/>
+      </Position>
+      <Position>
+        <Filename Value="DGS_SPICE.lpr"/>
+        <Caret Line="68" Column="9" TopLine="80"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="25" Column="18" TopLine="10"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="102" Column="3" TopLine="90"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="19" Column="21" TopLine="4"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="69" Column="10" TopLine="54"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="15" Column="5"/>
+      </Position>
+      <Position>
+        <Filename Value="uCircuit.pas"/>
+        <Caret Line="19" Column="15"/>
+      </Position>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints>
+      <Item>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="../NNet/NNet.lpr"/>
+        <Line Value="222"/>
+      </Item>
+    </BreakPoints>
+    <Watches>
+      <Item>
+        <Expression Value="Temp"/>
+      </Item>
+    </Watches>
+  </Debugging>
+</CONFIG>
