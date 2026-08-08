@@ -2,11 +2,16 @@
 
 Ein modularer SPICE-Simulator, der Schritt für Schritt in Free Pascal (Object Pascal) entwickelt wird.
 
-## Status: Phase 1 (Erfolgreich abgeschlossen)
+## Status: Phase 1 (Erfolgreich abgeschlossen & Erweitert)
 Der Simulator unterstützt in dieser Phase die **lineare DC-Analyse (Gleichstrom-Arbeitspunkt)** für Schaltungen aus:
 * Widerständen (`R`)
 * Unabhängigen Spannungsquellen (`V`)
 * Unabhängigen Stromquellen (`I`)
+
+Zusätzlich wurden folgende Komfortfunktionen implementiert:
+* **Stromberechnung für alle Komponenten**: Berechnung und tabellarische Ausgabe der Ströme durch alle Bauelemente (nicht nur Spannungsquellen).
+* **CSV-Export**: Ergebnisse können optional via `--csv <Dateiname>` als strukturierte CSV-Tabelle abgespeichert werden.
+* **MNA-Matrix-Visualisierung**: Die Option `--show-matrix` zeigt das aufgestellte Gleichungssystem ($A \cdot x = B$) mit namentlich nummerierten Knoten und Zweigströmen an.
 
 Die mathematische Formulierung erfolgt über die **Modifizierte Knotenpotentialanalyse (MNA)**. Das Gleichungssystem wird mit der mathematischen Bibliothek `LMATH` gelöst.
 
