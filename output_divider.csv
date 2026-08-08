@@ -1,0 +1,8 @@
+Type,Name,Value,Unit
+Voltage,0,0,V
+Voltage,1,10,V
+Voltage,2,5,V
+Voltage,GND,0,V
+Current,R1,0.005,A
+Current,R2,0.005,A
+Current,V1,-0.005,A

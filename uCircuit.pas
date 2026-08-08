@@ -24,8 +24,9 @@ type
 
     procedure AddComponent(AComp: TComponent);
     procedure Solve(out NodeVoltages: TDictionary<string, Double>;
-                    out SourceCurrents: TDictionary<string, Double>;
-                    out Success: Boolean);
+                    out ComponentCurrents: TDictionary<string, Double>;
+                    out Success: Boolean;
+                    AShowMatrix: Boolean = False);
     
     property Components: TObjectList<TComponent> read FComponents;
   end;
@@ -87,8 +88,9 @@ begin
 end;
 
 procedure TCircuit.Solve(out NodeVoltages: TDictionary<string, Double>;
-                         out SourceCurrents: TDictionary<string, Double>;
-                         out Success: Boolean);
+                         out ComponentCurrents: TDictionary<string, Double>;
+                         out Success: Boolean;
+                         AShowMatrix: Boolean = False);
 var
   NActiveNodes, Dim: Integer;
   A: TMatrix;
@@ -97,10 +99,11 @@ var
   i, VIdx: Integer;
   Comp: TComponent;
   NodeName: string;
+  VarNames, EqNames: array of string;
 begin
   Success := False;
   NodeVoltages := TDictionary<string, Double>.Create;
-  SourceCurrents := TDictionary<string, Double>.Create;
+  ComponentCurrents := TDictionary<string, Double>.Create;
 
   BuildNodeMap;
 
@@ -138,6 +141,52 @@ begin
     end;
   end;
 
+  if AShowMatrix then
+  begin
+    Writeln;
+    Writeln('--- Systemgleichungen (MNA-Matrix) ---');
+    
+    SetLength(VarNames, Dim + 1);
+    SetLength(EqNames, Dim + 1);
+    for i := 1 to NActiveNodes do
+    begin
+      VarNames[i] := 'V(' + FNodes[i-1] + ')';
+      EqNames[i] := 'KCL(' + FNodes[i-1] + ')';
+    end;
+    
+    VIdx := NActiveNodes;
+    for Comp in FComponents do
+    begin
+      if Comp is TVoltageSource then
+      begin
+        Inc(VIdx);
+        VarNames[VIdx] := 'I(' + Comp.Name + ')';
+        EqNames[VIdx] := 'Eq(' + Comp.Name + ')';
+      end;
+    end;
+
+    // Print column headers
+    Write(''.PadRight(12));
+    for VIdx := 1 to Dim do
+      Write(VarNames[VIdx].PadLeft(14));
+    Writeln('       B-Vektor');
+
+    // Print rows
+    for i := 1 to Dim do
+    begin
+      Write(EqNames[i].PadRight(12));
+      Write('[ ');
+      for VIdx := 1 to Dim do
+      begin
+        Write(Format('%12.6f', [A[i, VIdx]]));
+        if VIdx < Dim then
+          Write(', ');
+      end;
+      Writeln(' ] = [ ', Format('%12.6f', [B[i]]), ' ]');
+    end;
+    Writeln;
+  end;
+
   // 4. Solve the system LinEq(A, B, Lb, Ub, Det)
   LinEq(A, B, 1, Dim, Det);
 
@@ -158,14 +207,18 @@ begin
       end;
     end;
 
-    // Fill output source currents
+    // Fill output component currents
     VIdx := NActiveNodes;
     for Comp in FComponents do
     begin
       if Comp is TVoltageSource then
       begin
         Inc(VIdx);
-        SourceCurrents.Add(Comp.Name, B[VIdx]);
+        ComponentCurrents.Add(Comp.Name, Comp.GetCurrent(NodeVoltages, B[VIdx]));
+      end
+      else
+      begin
+        ComponentCurrents.Add(Comp.Name, Comp.GetCurrent(NodeVoltages, 0.0));
       end;
     end;
   end;

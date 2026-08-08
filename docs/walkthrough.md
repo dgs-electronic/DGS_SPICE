@@ -39,11 +39,17 @@ Ausgabe des Simulators:
   V(2)       =     5.000000 V
   V(GND)     =     0.000000 V
 
---- Stroeme durch Spannungsquellen ---
+--- Stroeme durch alle Komponenten ---
+  I(R1)      =     0.005000 A
+  I(R2)      =     0.005000 A
   I(V1)      =    -0.005000 A
 ========================================
 ```
-* **Verifikation:** Die Spannung an Knoten `2` beträgt exakt $5\text{V}$, der Strom aus der Quelle beträgt $5\text{mA}$ (das negative Vorzeichen folgt dem Verbraucher-Zählpfeilsystem). **Erfolg.**
+* **Verifikation:**
+  - Die Spannung an Knoten `2` beträgt exakt $5\text{V}$ (Spannungsteiler-Formel: $10\text{V} \cdot \frac{1\text{k}}{1\text{k}+1\text{k}} = 5\text{V}$).
+  - Der Strom durch $R_1$ und $R_2$ beträgt $5\text{mA}$.
+  - Der Strom aus der Quelle $V_1$ beträgt $-5\text{mA}$ (das negative Vorzeichen folgt dem Verbraucher-Zählpfeilsystem).
+  - Alle Werte stimmen physikalisch überein. **Erfolg.**
 
 ---
 
@@ -71,8 +77,18 @@ Ausgabe des Simulators:
   V(3)       =     6.545455 V
   V(GND)     =     0.000000 V
 
---- Stroeme durch Spannungsquellen ---
+--- Stroeme durch alle Komponenten ---
+  I(R1)      =     0.003273 A
+  I(R2)      =     0.005455 A
+  I(R3)      =     0.005455 A
+  I(R4)      =     0.003273 A
+  I(R5)      =    -0.002182 A
   I(V1)      =    -0.008727 A
 ========================================
 ```
-* **Verifikation:** Die analytisch berechneten Spannungen liegen bei $v_2 = 60/11\text{V} \approx 5{,}454545\text{V}$ und $v_3 = 72/11\text{V} \approx 6{,}545455\text{V}$, der Gesamtstrom bei $96/11\text{mA} \approx 8{,}72727\text{mA}$. Die Simulationsergebnisse stimmen exakt damit überein. **Erfolg.**
+* **Verifikation:**
+  - Die analytisch berechneten Spannungen liegen bei $v_2 = 60/11\text{V} \approx 5{,}454545\text{V}$ und $v_3 = 72/11\text{V} \approx 6{,}545455\text{V}$.
+  - Der Strom durch $R_5$ (von Knoten 2 nach 3) beträgt: $I(R_5) = \frac{5{,}454545 - 6{,}545455}{500} \approx -0{,}002182\text{ A}$ (fließt also von 3 nach 2).
+  - Der Strom durch $V_1$ beträgt $-8{,}727\text{ mA}$ und gleicht der Summe der Ströme in $R_1$ und $R_2$ ($3{,}273\text{ mA} + 5{,}455\text{ mA} = 8{,}728\text{ mA}$).
+  - Kirchhoffsches Knotengesetz (KCL) an Knoten 2: $-I(R_1) + I(R_3) + I(R_5) = -3{,}273\text{ mA} + 5{,}455\text{ mA} - 2{,}182\text{ mA} = 0$.
+  - Alle Werte sind konsistent und korrekt. **Erfolg.**

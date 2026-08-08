@@ -40,3 +40,15 @@ Führe die Simulation einer Netzliste aus:
 ```bash
 ./DGS_SPICE bridge.cir
 ```
+
+Um die Simulationsergebnisse als CSV-Datei zu exportieren, kann der optionale Parameter `--csv` verwendet werden:
+
+```bash
+./DGS_SPICE bridge.cir --csv ergebnisse.csv
+```
+
+Um die Matrizen des aufgestellten Gleichungssystems ($A$ und $B$) anzuzeigen, kann die Option `--show-matrix` angegeben werden:
+
+```bash
+./DGS_SPICE bridge.cir --show-matrix
+```

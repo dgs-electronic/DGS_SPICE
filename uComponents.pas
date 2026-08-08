@@ -19,6 +19,8 @@ type
     procedure Stamp(var A: TMatrix; var B: TVector;
                     NodeMap: TDictionary<string, Integer>;
                     VSourceIdx: Integer); virtual; abstract;
+    function GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                        VSourceCurrent: Double): Double; virtual; abstract;
   end;
 
   { Resistor component }
@@ -27,6 +29,8 @@ type
     procedure Stamp(var A: TMatrix; var B: TVector;
                     NodeMap: TDictionary<string, Integer>;
                     VSourceIdx: Integer); override;
+    function GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                        VSourceCurrent: Double): Double; override;
   end;
 
   { DC Voltage Source component }
@@ -35,6 +39,8 @@ type
     procedure Stamp(var A: TMatrix; var B: TVector;
                     NodeMap: TDictionary<string, Integer>;
                     VSourceIdx: Integer); override;
+    function GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                        VSourceCurrent: Double): Double; override;
   end;
 
   { DC Current Source component }
@@ -43,6 +49,8 @@ type
     procedure Stamp(var A: TMatrix; var B: TVector;
                     NodeMap: TDictionary<string, Integer>;
                     VSourceIdx: Integer); override;
+    function GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                        VSourceCurrent: Double): Double; override;
   end;
 
 implementation
@@ -126,6 +134,31 @@ begin
   // Current flows from Node1 to Node2
   AddToVector(B, n1, -Value);
   AddToVector(B, n2,  Value);
+end;
+
+function TResistor.GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                              VSourceCurrent: Double): Double;
+var
+  v1, v2: Double;
+begin
+  if not NodeVoltages.TryGetValue(Node1, v1) then v1 := 0.0;
+  if not NodeVoltages.TryGetValue(Node2, v2) then v2 := 0.0;
+  if Value <> 0 then
+    Result := (v1 - v2) / Value
+  else
+    Result := (v1 - v2) * 1.0E12;
+end;
+
+function TVoltageSource.GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                                   VSourceCurrent: Double): Double;
+begin
+  Result := VSourceCurrent;
+end;
+
+function TCurrentSource.GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                                   VSourceCurrent: Double): Double;
+begin
+  Result := Value;
 end;
 
 end.

@@ -63,6 +63,29 @@ Eine Spannungsquelle mit Spannung $V$ zwischen Knoten $n_1$ (positiv) und $n_2$ 
 
 *Hinweis: Stempel-Operationen, die sich auf den Masse-Knoten (`0` oder `GND`) beziehen, werden in der Matrix ignorert (da das Massepotential als bekannt vorausgesetzt und zu $0\text{V}$ definiert ist).*
 
+### Stromberechnung nach der Simulation
+
+Nachdem das Gleichungssystem gelöst wurde, liegen die Knotenspannungen (in `NodeVoltages`) und die Ströme durch die Spannungsquellen (im Lösungsvektor an der Position des jeweiligen `VSourceIdx`) vor. Der Strom durch ein beliebiges Bauelement wird über die Methode `GetCurrent` ermittelt:
+
+```pascal
+function GetCurrent(NodeVoltages: TDictionary<string, Double>;
+                    VSourceCurrent: Double): Double; virtual; abstract;
+```
+
+#### 1. Widerstand (`TResistor`)
+Der Strom fließt von Knoten $n_1$ nach $n_2$:
+$$I_R = \frac{V(n_1) - V(n_2)}{R}$$
+Falls der Widerstandswert $R = 0$ ist, wird die Stromberechnung mit der großen Ersatzleitfähigkeit durchgeführt:
+$$I_R = (V(n_1) - V(n_2)) \cdot 10^{12}$$
+
+#### 2. Unabhängige Spannungsquelle (`TVoltageSource`)
+Der Strom durch die Spannungsquelle wurde direkt durch die MNA berechnet und entspricht dem vom Solver ermittelten Wert:
+$$I_V = I_{vsource\_solved}$$
+
+#### 3. Unabhängige Stromquelle (`TCurrentSource`)
+Der Strom durch die Stromquelle ist eingeprägt und entspricht stets ihrem Nennwert:
+$$I_I = I_{source}$$
+
 ---
 
 ## 3. Solver-Integration (`LMATH`)
@@ -116,4 +139,43 @@ fpc -vm4046 -Mdelphi -Fulmath/lmGenMath -Fulmath/lmLinearAlgebra -O2 DGS_SPICE.l
 ### Ausführen
 ```bash
 ./DGS_SPICE divider.cir
+```
+
+### CSV-Export
+Über den optionalen Kommandozeilenparameter `--csv` können die berechneten Knotenspannungen und Ströme in eine tabellarische CSV-Datei exportiert werden:
+```bash
+./DGS_SPICE divider.cir --csv output.csv
+```
+
+Die CSV-Datei besitzt ein standardisiertes Format mit Kopfzeile:
+```csv
+Type,Name,Value,Unit
+Voltage,0,0,V
+Voltage,1,10,V
+Voltage,2,5,V
+Voltage,GND,0,V
+Current,R1,0.005,A
+Current,R2,0.005,A
+Current,V1,-0.005,A
+```
+
+Dabei steht:
+- **Type**: Art des Messergebnisses (`Voltage` für Knotenspannung, `Current` für Zweigstrom).
+- **Name**: Bezeichnung des Knotens (z. B. `1`, `2`) oder des Bauelements (z. B. `R1`, `V1`).
+- **Value**: Der berechnete Fließkommawert (Punkt als Dezimaltrenner, volle numerische Genauigkeit).
+- **Unit**: Die zugehörige physikalische Einheit (`V` für Volt, `A` für Ampere).
+
+### Matrix-Anzeige
+Über den optionalen Kommandozeilenparameter `--show-matrix` können die Systemmatrizen des Gleichungssystems direkt vor dem Lösen im Terminal ausgegeben werden:
+```bash
+./DGS_SPICE divider.cir --show-matrix
+```
+
+Dies gibt die MNA-Systemgleichungen inklusive der Bezeichnungen der Knotenpotentiale (Spalten-Variablen), der Gleichungsarten (KCL an den Knoten bzw. Spannungsquellen-Zweige) und des B-Vektors aus. Beispielsweise für einen Spannungsteiler:
+```text
+--- Systemgleichungen (MNA-Matrix) ---
+                      V(1)          V(2)         I(V1)       B-Vektor
+KCL(1)      [     0.001000,    -0.001000,     1.000000 ] = [     0.000000 ]
+KCL(2)      [    -0.001000,     0.002000,     0.000000 ] = [     0.000000 ]
+Eq(V1)      [     1.000000,     0.000000,     0.000000 ] = [    10.000000 ]
 ```
