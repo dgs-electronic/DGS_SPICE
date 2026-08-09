@@ -10,12 +10,12 @@ type
 
 procedure ShowUsage;
 begin
-  Writeln('DGS-SPICE Simulator - Phase 1 (Gleichstrom-Arbeitspunkt)');
-  Writeln('Usage: DGS_SPICE <Netzliste.cir> [Analysetyp] [--csv <Output-Datei>] [--show-matrix]');
-  Writeln('Analysetypen:');
-  Writeln('  -OP                    DC-Arbeitspunkt-Analyse (Standard)');
-  Writeln('  -TRAN                  Transientenanalyse (Zeitbereich - noch nicht implementiert)');
-  Writeln('  -AC                    AC-Wechselstromanalyse (Frequenzbereich - noch nicht implementiert)');
+  Writeln('DGS-SPICE Simulator');
+  Writeln('Usage: DGS_SPICE <Netzliste.cir> [--csv <Output-Datei>] [--show-matrix]');
+  Writeln('Die Art der Simulation wird ueber Steuerbefehle am Ende der Netzliste bestimmt:');
+  Writeln('  .op                    DC-Arbeitspunkt-Analyse (Standard)');
+  Writeln('  .tran <step> <stop>    Transientenanalyse');
+  Writeln('  .ac                    AC-Wechselstromanalyse (noch nicht implementiert)');
   Writeln('Optionen:');
   Writeln('  --csv <Output-Datei>   Speichert die Simulationsergebnisse als CSV-Datei ab.');
   Writeln('  --show-matrix          Zeigt die Systemmatrizen des Gleichungssystems an.');
@@ -174,21 +174,6 @@ begin
       ShowMatrix := True;
       Inc(ArgIdx);
     end
-    else if (UpperCase(ParamStr(ArgIdx)) = '-OP') then
-    begin
-      AnalysisMode := amOP;
-      Inc(ArgIdx);
-    end
-    else if (UpperCase(ParamStr(ArgIdx)) = '-TRAN') then
-    begin
-      AnalysisMode := amTRAN;
-      Inc(ArgIdx);
-    end
-    else if (UpperCase(ParamStr(ArgIdx)) = '-AC') then
-    begin
-      AnalysisMode := amAC;
-      Inc(ArgIdx);
-    end
     else
     begin
       if Filename = '' then
@@ -201,22 +186,6 @@ begin
         Exit;
       end;
       Inc(ArgIdx);
-    end;
-  end;
-
-  // Handle analysis modes that are not yet implemented
-  case AnalysisMode of
-    amTRAN:
-    begin
-      Writeln('Fehler: Transientenanalyse (-TRAN) ist noch nicht implementiert.');
-      ExitCode := 3;
-      Exit;
-    end;
-    amAC:
-    begin
-      Writeln('Fehler: AC-Analyse (-AC) ist noch nicht implementiert.');
-      ExitCode := 3;
-      Exit;
     end;
   end;
 
@@ -247,25 +216,68 @@ begin
     end;
   end;
 
-  Writeln('Berechne Arbeitspunkt...');
-  try
-    Circuit.Solve(NodeVoltages, ComponentCurrents, Success, ShowMatrix);
-    if Success then
-    begin
-      PrintResults(NodeVoltages, ComponentCurrents);
-      
-      if CsvFilename <> '' then
-        SaveResultsToCsv(CsvFilename, NodeVoltages, ComponentCurrents);
-
-      NodeVoltages.Free;
-      ComponentCurrents.Free;
-    end
-    else
-    begin
-      Writeln('Fehler: Schaltung konnte nicht geloest werden (Matrix singulaer?).');
-      ExitCode := 2;
-    end;
-  finally
+  // Determine final analysis mode based on netlist control cards
+  if Circuit.HasAc then
+  begin
+    Writeln('Fehler: AC-Analyse (.ac) ist noch nicht implementiert.');
+    ExitCode := 3;
     Circuit.Free;
+    Exit;
+  end
+  else if Circuit.HasTran then
+  begin
+    AnalysisMode := amTRAN;
+  end
+  else
+  begin
+    AnalysisMode := amOP;
+  end;
+
+  if AnalysisMode = amTRAN then
+  begin
+    if CsvFilename = '' then
+      CsvFilename := ChangeFileExt(Filename, '.csv');
+
+    Writeln('Starte Transientenanalyse...');
+    Writeln(Format('Tstep = %g, Tstop = %g, Tstart = %g', [Circuit.TStep, Circuit.TStop, Circuit.TStart]));
+    try
+      Circuit.SolveTransient(CsvFilename, Success, ShowMatrix);
+      if Success then
+      begin
+        Writeln('Transientenanalyse erfolgreich beendet.');
+        Writeln('Ergebnisse gespeichert in: ', CsvFilename);
+      end
+      else
+      begin
+        Writeln('Fehler: Transientenanalyse abgebrochen.');
+        ExitCode := 2;
+      end;
+    finally
+      Circuit.Free;
+    end;
+  end
+  else
+  begin
+    Writeln('Berechne Arbeitspunkt...');
+    try
+      Circuit.Solve(NodeVoltages, ComponentCurrents, Success, ShowMatrix);
+      if Success then
+      begin
+        PrintResults(NodeVoltages, ComponentCurrents);
+        
+        if CsvFilename <> '' then
+          SaveResultsToCsv(CsvFilename, NodeVoltages, ComponentCurrents);
+
+        NodeVoltages.Free;
+        ComponentCurrents.Free;
+      end
+      else
+      begin
+        Writeln('Fehler: Schaltung konnte nicht geloest werden (Matrix singulaer?).');
+        ExitCode := 2;
+      end;
+    finally
+      Circuit.Free;
+    end;
   end;
 end.

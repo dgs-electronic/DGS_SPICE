@@ -1,0 +1,6 @@
+* RLC Sine Resonant Test
+V1 1 0 SINE(0 5 1k)
+R1 1 2 10
+L1 2 3 10m
+C1 3 0 10u
+.tran 10u 5m

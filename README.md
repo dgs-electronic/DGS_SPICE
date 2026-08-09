@@ -2,18 +2,17 @@
 
 Ein modularer SPICE-Simulator, der Schritt für Schritt in Free Pascal (Object Pascal) entwickelt wird.
 
-## Status: Phase 1 (Erfolgreich abgeschlossen & Erweitert)
-Der Simulator unterstützt in dieser Phase die **lineare DC-Analyse (Gleichstrom-Arbeitspunkt)** für Schaltungen aus:
-* Widerständen (`R`)
-* Unabhängigen Spannungsquellen (`V`)
-* Unabhängigen Stromquellen (`I`)
-* Kapazitäten (`C`) (als Leerlauf modelliert)
-* Spulen (`L`) (als Kurzschluss modelliert)
-
-Zusätzlich wurden folgende Komfortfunktionen implementiert:
-* **Stromberechnung für alle Komponenten**: Berechnung und tabellarische Ausgabe der Ströme durch alle Bauelemente (nicht nur Spannungsquellen).
-* **CSV-Export**: Ergebnisse können optional via `--csv <Dateiname>` als strukturierte CSV-Tabelle abgespeichert werden.
-* **MNA-Matrix-Visualisierung**: Die Option `--show-matrix` zeigt das aufgestellte Gleichungssystem ($A \cdot x = B$) mit namentlich nummerierten Knoten und Zweigströmen an.
+## Status: Phase 2 (Transientenanalyse & DC-Arbeitspunkt)
+Der Simulator unterstützt:
+* **DC-Arbeitspunkt-Analyse (`-OP`)** für R, L, C, V, I.
+* **Transientenanalyse (`-TRAN`)** mit implizitem **Backward-Euler-Verfahren** zur stabilen Zeitintegration von Kondensatoren (`C`) und Spulen (`L`).
+* **LTSpice-kompatible transiente Quellenfunktionen** für Spannungs- und Stromquellen:
+  * `PULSE(...)`
+  * `SINE(...)` / `SIN(...)`
+  * `PWL(...)`
+  * `PWL FILE "filepath"`
+* **CSV-Datenexport**: Ergebnisse einer Transientenanalyse werden spaltenweise (Zeit, Knotenspannungen und alle Zweigströme) in eine CSV-Datei exportiert.
+* **MNA-Matrix-Visualisierung**: Die Option `--show-matrix` zeigt das aufgestellte Gleichungssystem ($A \cdot x = B$) für jeden Zeitschritt an.
 
 Die mathematische Formulierung erfolgt über die **Modifizierte Knotenpotentialanalyse (MNA)**. Das Gleichungssystem wird mit der mathematischen Bibliothek `LMATH` gelöst.
 
@@ -42,21 +41,20 @@ Stelle sicher, dass der Free Pascal Compiler (`fpc`) auf deinem System installie
 fpc -Mdelphi -Fulmath/lmGenMath -Fulmath/lmLinearAlgebra -O2 DGS_SPICE.lpr
 ```
 
-Führe die Simulation einer Netzliste aus (standardmäßig wird eine DC-Arbeitspunkt-Analyse `-OP` durchgeführt):
+Führe die Simulation einer Netzliste aus:
 
 ```bash
 ./DGS_SPICE bridge.cir
 ```
 
-Um einen bestimmten Analysetyp explizit anzugeben, können die folgenden Parameter verwendet werden:
-- `-OP`: DC-Arbeitspunkt-Analyse (vollständig unterstützt)
-- `-TRAN`: Transientenanalyse (in Vorbereitung)
-- `-AC`: AC-Frequenzanalyse (in Vorbereitung)
+Die Auswahl des Analysetyps erfolgt ausschließlich über entsprechende Steuerbefehle am Ende der Netzliste:
+* **`.op`**: Führt eine DC-Arbeitspunkt-Analyse (Operational Point) durch. Dies ist das Standardverhalten, falls kein anderer Steuerbefehl angegeben wird.
+* **`.tran <Tstep> <Tstop> [<Tstart>]`**: Startet eine Transientenanalyse (Zeitbereichssimulation).
+  * **`Tstep`**: Die Zeitschrittweite der transienten Simulation (z. B. `10u` für $10\,\mu\text{s}$). Bestimmt die Auflösung der Berechnungen.
+  * **`Tstop`**: Die Simulationsendzeit (z. B. `5m` für $5\,\text{ms}$).
+  * **`Tstart`** *(optional)*: Die Zeit, ab der die Simulationsergebnisse in die CSV exportiert werden sollen. Die Berechnung startet immer ab $t=0$, aber das Schreiben der Ergebnisse erfolgt erst ab `Tstart` (Standard: `0.0`).
+* **`.ac`**: AC-Wechselstromanalyse (derzeit noch nicht implementiert).
 
-Beispiel für den Aufruf der Arbeitspunkt-Analyse:
-```bash
-./DGS_SPICE bridge.cir -OP
-```
 
 Um die Simulationsergebnisse als CSV-Datei zu exportieren, kann der optionale Parameter `--csv` verwendet werden:
 
@@ -73,4 +71,4 @@ Um die Matrizen des aufgestellten Gleichungssystems ($A$ und $B$) anzuzeigen, ka
 ## Entwicklungsunterstützung (KI)
 
 Dieses Projekt wurde mit Unterstützung der folgenden künstlichen Intelligenz(en) entwickelt:
-* **Antigravity (Google DeepMind)**: Assistenz bei Konzeptionierung, Implementierung der MNA-Matrixstempel, CLI-Parameter-Erweiterungen, Verifikation und Dokumentation.
+* **Antigravity (Google DeepMind)**: Assistenz bei Konzeptionierung, Implementierung der MNA-Matrixstempel, CLI-Parameter-Erweiterungen, Zeitbereichsintegration mit Backward Euler, LTSpice-Source-Funktionen (Pulse, Sine, PWL), CSV-Export, Verifikation und Dokumentation.

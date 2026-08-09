@@ -1,17 +1,17 @@
-# Technische Dokumentation: DGS-SPICE Phase 1
+# Technische Dokumentation: DGS-SPICE Phase 2 (Transientenanalyse & DC-Arbeitspunkt)
 
-DGS-SPICE ist ein in Free Pascal geschriebener SPICE-Simulator. Diese Dokumentation beschreibt die Architektur, die mathematischen Grundlagen und die konkrete Implementierung von **Phase 1** (linearer Gleichstrom-Arbeitspunkt).
+DGS-SPICE ist ein in Free Pascal geschriebener SPICE-Simulator. Diese Dokumentation beschreibt die Architektur, die mathematischen Grundlagen und die konkrete Implementierung von **Phase 2** (Transientenanalyse und linearer Gleichstrom-Arbeitspunkt).
 
 ---
 
 ## 1. Projektstruktur und Komponenten
 
-Das Projekt ist modular aufgebaut und besteht aus vier Hauptdateien im Verzeichnis `DGS-SPICE`:
+Das Projekt besteht aus folgenden Hauptdateien im Verzeichnis `DGS-SPICE`:
 
-* **`DGS_SPICE.lpr`**: Der Einstiegspunkt (Hauptprogramm). Übernimmt die Argumentenverarbeitung, steuert den Ablauf (Parsen -> Berechnen -> Ausgeben) und formatiert die Terminalausgabe.
-* **`uCircuit.pas`**: Der mathematische Kern. Verwaltet die Schaltungstopologie, die MNA-Matrix-Assemblierung und den Aufruf des Solvers.
-* **`uComponents.pas`**: Die Bauelemente-Unit. Definiert die Basisklasse `TComponent` sowie deren konkrete Nachkommen (`TResistor`, `TVoltageSource`, `TCurrentSource`) und deren Stempel-Methoden.
-* **`uParser.pas`**: Der Netzlisten-Parser. Übersetzt Textdateien in die internen Objektstrukturen und berechnet Skalierungsfaktoren für physikalische Einheiten.
+* **`DGS_SPICE.lpr`**: Der Einstiegspunkt (Hauptprogramm). Übernimmt die Argumentenverarbeitung, steuert den Ablauf (Parsen -> Berechnen -> Ausgeben) und formatiert die Terminalausgabe. Schaltet automatisch auf Transientenanalyse um, wenn eine `.tran`-Anweisung in der Netzliste enthalten ist.
+* **`uCircuit.pas`**: Der mathematische Kern. Verwaltet die Schaltungstopologie, die MNA-Matrix-Assemblierung, den Gleichstrom-Arbeitspunkt und die Zeitintegrationsschleife.
+* **`uComponents.pas`**: Die Bauelemente-Unit. Definiert die Basisklasse `TComponent`, die konkreten Bauelemente (`TResistor`, `TVoltageSource`, `TCurrentSource`, `TCapacitor`, `TInductor`) und die LTSpice-kompatiblen Quellenfunktionen (`TSourceFunction`).
+* **`uParser.pas`**: Der Netzlisten-Parser. Übersetzt Textdateien in die internen Objektstrukturen, liest Steuerkarten wie `.tran` und parst komplexe transiente Quellenbeschreibungen wie `PULSE(...)`, `SINE(...)`, `PWL(...)` und `PWL FILE ...`.
 
 ---
 
@@ -19,193 +19,156 @@ Das Projekt ist modular aufgebaut und besteht aus vier Hauptdateien im Verzeichn
 
 Der Simulator stellt für eine Schaltung ein lineares Gleichungssystem der Form:
 
-$$A \cdot x = B$$
+```text
+A * x = B
+```
 
-auf. Die Dimension $D$ dieses Systems berechnet sich aus:
+auf. Die Dimension `D` dieses Systems berechnet sich aus:
 
-$$D = N_{active} + N_{sources}$$
+```text
+D = N_active + N_sources
+```
 
 wobei:
-* $N_{active}$ die Anzahl der Knoten ohne Bezugspotential (Masse `0` / `GND`) ist.
-* $N_{sources}$ die Anzahl der unabhängigen Spannungsquellen ist.
-
-### Matrix-Layout im Speicher
-Unter Verwendung der `LMATH`-Bibliothek wird die Matrix $A$ als zweidimensionales dynamisches Array `TMatrix` (`array of array of Float`) angelegt und über die Prozedur `DimMatrix(A, D, D)` initialisiert. Dies ermöglicht eine intuitive 2D-Indexierung `A[Row, Col]` direkt mit den 1-basierten Knotenindizes, ohne flache Indexberechnungen.
-
-### Stempel-Verfahren (Stamping) in Pascal
-Jedes Bauelement erbt von der Klasse `TComponent` und implementiert die Methode `Stamp`:
-
-```pascal
-procedure Stamp(var A: TMatrix; var B: TVector;
-                NodeMap: TDictionary<string, Integer>;
-                VSourceIdx: Integer); virtual; abstract;
-```
-
-#### 1. Widerstand (`TResistor`)
-Ein Widerstand mit Wert $R$ (Leitwert $g = 1/R$) zwischen Knoten $n_1$ und $n_2$ addiert Leitwerte an den Kreuzungspunkten der Knoten:
-* $A[n_1, n_1] \mathrel{+}= g$
-* $A[n_1, n_2] \mathrel{-}= g$
-* $A[n_2, n_1] \mathrel{-}= g$
-* $A[n_2, n_2] \mathrel{+}= g$
-
-#### 2. Unabhängige Stromquelle (`TCurrentSource`)
-Eine Stromquelle mit Strom $I$ von Knoten $n_1$ nach $n_2$ speist Strom aus $n_1$ aus und in $n_2$ ein:
-* $B[n_1] \mathrel{-}= I$
-* $B[n_2] \mathrel{+}= I$
-
-#### 3. Unabhängige Spannungsquelle (`TVoltageSource`)
-Eine Spannungsquelle mit Spannung $V$ zwischen Knoten $n_1$ (positiv) und $n_2$ (negativ) führt eine zusätzliche Unbekannte ein (den Strom $I_{src}$ durch die Quelle). Dieser bekommt den Spalten- und Zeilenindex $V_{idx} = N_{active} + \text{Quellen-Index}$:
-* $A[n_1, V_{idx}] \mathrel{+}= 1.0$
-* $A[n_2, V_{idx}] \mathrel{-}= 1.0$
-* $A[V_{idx}, n_1] \mathrel{+}= 1.0$
-* $A[V_{idx}, n_2] \mathrel{-}= 1.0$
-* $B[V_{idx}] \mathrel{+}= V$
-
-#### 4. Kapazität (`TCapacitor`)
-Eine Kapazität verhält sich im DC-Fall wie ein Leerlauf (offene Verbindung). Um singuläre Matrizen zu vermeiden, wird sie mit einer minimalen Leitfähigkeit ($g = 10^{-12}$ S) gestempelt:
-* $A[n_1, n_1] \mathrel{+}= 10^{-12}$
-* $A[n_1, n_2] \mathrel{-}= 10^{-12}$
-* $A[n_2, n_1] \mathrel{-}= 10^{-12}$
-* $A[n_2, n_2] \mathrel{+}= 10^{-12}$
-
-#### 5. Spule (`TInductor`)
-Eine Spule verhält sich im DC-Fall wie ein Kurzschluss (Widerstand $R = 0$). Sie wird genau wie eine $0\text{V}$-Spannungsquelle gestempelt (inkl. einer neuen Zweigstromvariable bei Index $V_{idx}$):
-* $A[n_1, V_{idx}] \mathrel{+}= 1.0$
-* $A[n_2, V_{idx}] \mathrel{-}= 1.0$
-* $A[V_{idx}, n_1] \mathrel{+}= 1.0$
-* $A[V_{idx}, n_2] \mathrel{-}= 1.0$
-* $B[V_{idx}] \mathrel{+}= 0.0$
-
-*Hinweis: Stempel-Operationen, die sich auf den Masse-Knoten (`0` oder `GND`) beziehen, werden in der Matrix ignoriert (da das Massepotential als bekannt vorausgesetzt und zu $0\text{V}$ definiert ist).*
-
-### Stromberechnung nach der Simulation
-
-Nachdem das Gleichungssystem gelöst wurde, liegen die Knotenspannungen (in `NodeVoltages`) und die Ströme durch die Spannungsquellen (im Lösungsvektor an der Position des jeweiligen `VSourceIdx`) vor. Der Strom durch ein beliebiges Bauelement wird über die Methode `GetCurrent` ermittelt:
-
-```pascal
-function GetCurrent(NodeVoltages: TDictionary<string, Double>;
-                    VSourceCurrent: Double): Double; virtual; abstract;
-```
-
-#### 1. Widerstand (`TResistor`)
-Der Strom fließt von Knoten $n_1$ nach $n_2$:
-$$I_R = \frac{V(n_1) - V(n_2)}{R}$$
-Falls der Widerstandswert $R = 0$ ist, wird die Stromberechnung mit der großen Ersatzleitfähigkeit durchgeführt:
-$$I_R = (V(n_1) - V(n_2)) \cdot 10^{12}$$
-
-#### 2. Unabhängige Spannungsquelle (`TVoltageSource`)
-Der Strom durch die Spannungsquelle wurde direkt durch die MNA berechnet und entspricht dem vom Solver ermittelten Wert:
-$$I_V = I_{vsource\_solved}$$
-
-#### 3. Unabhängige Stromquelle (`TCurrentSource`)
-Der Strom durch die Stromquelle ist eingeprägt und entspricht stets ihrem Nennwert:
-$$I_I = I_{source}$$
-
-#### 4. Kapazität (`TCapacitor`)
-Der DC-Strom durch eine Kapazität ist im eingeschwungenen Zustand stets null:
-$$I_C = 0.0$$
-
-#### 5. Spule (`TInductor`)
-Der Strom durch die Spule entspricht dem durch die MNA-Gleichung bestimmten Wert:
-$$I_L = I_{inductor\_solved}$$
+* `N_active` die Anzahl der Knoten ohne Bezugspotential (Masse `0` / `GND`) ist.
+* `N_sources` die Anzahl der unabhängigen Spannungsquellen (inkl. Spulen, da diese im DC-Fall als Kurzschlüsse mit Zweigströmen modelliert werden) ist.
 
 ---
 
-## 3. Solver-Integration (`LMATH`)
+## 3. Diskrete Zeitintegration (Backward-Euler-Verfahren)
 
-Die Lösung des Gleichungssystems erfolgt über die LMath-Unit `ulineq` mittels des Gauss-Jordan-Algorithmus:
+Für die Transientenanalyse (`-TRAN`) wird das kontinuierliche Verhalten von Kapazitäten (`C`) und Spulen (`L`) über das **implizite Euler-Verfahren (Backward Euler)** in diskrete Stempel überführt. Dies geschieht in jedem Zeitschritt `t` mit Schrittweite `h`.
 
-```pascal
-LinEq(A, B, 1, Dim, Det);
-```
-
-* **`A`**: Systemkoeffizienten-Matrix (Typ `TMatrix`), wird während der Berechnung überschrieben.
-* **`B`**: RHS-Eingangsvektor (Typ `TVector`), wird nach erfolgreichem Berechnen direkt mit dem Lösungsvektor überschrieben (Knotenspannungen $1 \dots N_{active}$, gefolgt von den Strömen der Spannungsquellen).
-* **`1`**: Untere Indexgrenze des zu lösenden Systems.
-* **`Dim`**: Obere Indexgrenze des Systems.
-* **`Det`**: Rückgabewert für die Determinante der Matrix (Typ `Float`).
-
-Nach dem Aufruf wird über die Funktion `MathErr` geprüft, ob die Berechnung erfolgreich war (Rückgabewert `MatOk` oder `0`). Ist die Matrix singulär, wird der Fehlercode `MatSing` (`8`) zurückgegeben.
-
----
-
-## 4. Parser & Einheiten-Verarbeitung
-
-Der Parser in `uParser.pas` liest die Netzliste zeilenweise ein, ignoriert Kommentare (`*`) und Steuerbefehle (`.`).
-Die Skalierung physikalischer Werte erfolgt über reguläre Suffixe (case-insensitive):
-
-| Suffix | Name | Faktor | Beispiel in Netzliste |
-|---|---|---|---|
-| **T** | Tera | $10^{12}$ | `1T` |
-| **G** | Giga | $10^9$ | `2.5G` |
-| **MEG** | Mega | $10^6$ | `10Meg` |
-| **K** | Kilo | $10^3$ | `1k` |
-| **M** | Milli | $10^{-3}$ | `10m` / `10M` *(SPICE-Standard!)* |
-| **U** | Mikro | $10^{-6}$ | `1u` |
-| **N** | Nano | $10^{-9}$ | `4.7n` |
-| **P** | Piko | $10^{-12}$ | `10p` |
-| **F** | Femto | $10^{-15}$ | `1f` |
-
----
-
-## 5. Kompilierung und Ausführung
-
-### Voraussetzungen
-* Installierter Free Pascal Compiler (`fpc`), Version 3.0+. Die `LMATH`-Bibliotheksdateien müssen im lokalen Projektverzeichnis unter `lmath/` liegen.
-
-### Kompilieren
-Im Projektverzeichnis ausführen (unter Einbindung des LMATH-Suchpfads und Aktivierung des Delphi-Kompatibilitätsmodus):
-```bash
-fpc -vm4046 -Mdelphi -Fulmath/lmGenMath -Fulmath/lmLinearAlgebra -O2 DGS_SPICE.lpr
-```
-
-### Ausführen
-Standardmäßig wird eine DC-Arbeitspunkt-Analyse durchgeführt. Die Analyseart kann jedoch explizit über Parameter gesteuert werden:
-
-```bash
-./DGS_SPICE divider.cir -OP
-```
-
-#### Unterstützte Analyse-Parameter:
-* **`-OP`**: Führt eine DC-Arbeitspunkt-Analyse (Operational Point) durch. Dies ist der Standardmodus.
-* **`-TRAN`**: Transientenanalyse (Zeitbereichssimulation). Derzeit noch nicht implementiert (gibt Fehlermeldung und Exit-Code `3` aus).
-* **`-AC`**: AC-Frequenzgang-Analyse. Derzeit noch nicht implementiert (gibt Fehlermeldung und Exit-Code `3` aus).
-
-### CSV-Export
-Über den optionalen Kommandozeilenparameter `--csv` können die berechneten Knotenspannungen und Ströme in eine tabellarische CSV-Datei exportiert werden:
-```bash
-./DGS_SPICE divider.cir --csv output.csv
-```
-
-Die CSV-Datei besitzt ein standardisiertes Format mit Kopfzeile:
-```csv
-Type,Name,Value,Unit
-Voltage,0,0,V
-Voltage,1,10,V
-Voltage,2,5,V
-Voltage,GND,0,V
-Current,R1,0.005,A
-Current,R2,0.005,A
-Current,V1,-0.005,A
-```
-
-Dabei steht:
-- **Type**: Art des Messergebnisses (`Voltage` für Knotenspannung, `Current` für Zweigstrom).
-- **Name**: Bezeichnung des Knotens (z. B. `1`, `2`) oder des Bauelements (z. B. `R1`, `V1`).
-- **Value**: Der berechnete Fließkommawert (Punkt als Dezimaltrenner, volle numerische Genauigkeit).
-- **Unit**: Die zugehörige physikalische Einheit (`V` für Volt, `A` für Ampere).
-
-### Matrix-Anzeige
-Über den optionalen Kommandozeilenparameter `--show-matrix` können die Systemmatrizen des Gleichungssystems direkt vor dem Lösen im Terminal ausgegeben werden:
-```bash
-./DGS_SPICE divider.cir --show-matrix
-```
-
-Dies gibt die MNA-Systemgleichungen inklusive der Bezeichnungen der Knotenpotentiale (Spalten-Variablen), der Gleichungsarten (KCL an den Knoten bzw. Spannungsquellen-Zweige) und des B-Vektors aus. Beispielsweise für einen Spannungsteiler:
+### 3.1 Kapazität (`TCapacitor`)
+Das kontinuierliche Gesetz lautet:
 ```text
---- Systemgleichungen (MNA-Matrix) ---
-                      V(1)          V(2)         I(V1)       B-Vektor
-KCL(1)      [     0.001000,    -0.001000,     1.000000 ] = [     0.000000 ]
-KCL(2)      [    -0.001000,     0.002000,     0.000000 ] = [     0.000000 ]
-Eq(V1)      [     1.000000,     0.000000,     0.000000 ] = [    10.000000 ]
+i_C(t) = C * d(v_C(t)) / dt
 ```
+
+Die Diskretisierung nach dem Backward-Euler-Verfahren im Schritt `t_n+1` ergibt:
+```text
+i_C(t_n+1) = C * (v_C(t_n+1) - v_C(t_n)) / h = Geq * v_C(t_n+1) - Ieq
+```
+
+Hierbei ist:
+* **Ersatzleitwert**: `Geq = C / h`
+* **Ersatzstromquelle**: `Ieq = (C / h) * v_C(t_n)` (parallel zu `Geq` geschaltet, fließt von Knoten `n1` zu `n2`)
+
+**MNA-Stempel im Transientenschritt**:
+* `A[n1, n1] += Geq`
+* `A[n1, n2] -= Geq`
+* `A[n2, n1] -= Geq`
+* `A[n2, n2] += Geq`
+* `B[n1] += Ieq`
+* `B[n2] -= Ieq`
+
+### 3.2 Spule (`TInductor`)
+Das kontinuierliche Gesetz lautet:
+```text
+v_L(t) = L * d(i_L(t)) / dt
+```
+
+Die Diskretisierung nach dem Backward-Euler-Verfahren ergibt:
+```text
+v_L(t_n+1) = L * (i_L(t_n+1) - i_L(t_n)) / h
+=> v_L(t_n+1) - (L / h) * i_L(t_n+1) = -(L / h) * i_L(t_n)
+```
+
+Dies führt zu einer zusätzlichen Gleichung für den Zweigstrom `i_L` (Spalten- und Zeilenindex `V_idx`):
+* **Ersatzwiderstand**: `Req = L / h`
+* **Ersatzspannungsquelle**: `Veq = -(L / h) * i_L(t_n)`
+
+**MNA-Stempel im Transientenschritt**:
+* `A[n1, V_idx] += 1.0`
+* `A[n2, V_idx] -= 1.0`
+* `A[V_idx, n1] += 1.0`
+* `A[V_idx, n2] -= 1.0`
+* `A[V_idx, V_idx] -= Req`
+* `B[V_idx] += Veq`
+
+---
+
+## 4. Transiente Quellenfunktionen (`TSourceFunction`)
+
+Spannungs- und Stromquellen können transiente Funktionen zur zeitabhängigen Signalgenerierung verwenden:
+
+### 4.1 PULSE(V1 V2 TD TR TF PW PER [Ncycles])
+Generiert eine periodische Pulsfolge.
+* `V1`: Anfangswert
+* `V2`: Pulswert
+* `TD`: Verzögerungszeit (Delay)
+* `TR` / `TF`: Anstiegs- und Abfallzeit (Standard: `1e-12` s falls `0.0`)
+* `PW`: Pulsbreite
+* `PER`: Periode
+* `Ncycles`: Anzahl der Zyklen (Standard: unendlich)
+
+### 4.2 SINE(VO VA FREQ TD THETA PHI Ncycles) or SIN(...)
+Generiert eine gedämpfte Sinusschwingung.
+* `VO`: DC-Offset
+* `VA`: Amplitude
+* `FREQ`: Frequenz
+* `TD`: Verzögerungszeit (Delay)
+* `THETA`: Dämpfungsfaktor
+* `PHI`: Phasenwinkel in Grad
+* `Ncycles`: Anzahl der Zyklen
+
+### 4.3 PWL(t1 v1 t2 v2 ...)
+Stückweise linearer Verlauf (Piece-Wise Linear). Zwischen den angegebenen Stützstellen `(t_i, v_i)` wird linear interpoliert. Außerhalb des Intervalls wird der erste bzw. letzte Wert gehalten.
+
+### 4.4 PWL FILE "filename"
+Liest den stückweise linearen Verlauf aus einer externen Textdatei aus. Unterstützt Kommentare (`*`, `;`, `#`) sowie standardmäßige SPICE-Einheiten-Suffixe.
+
+---
+
+## 5. Solver & Simulationsablauf
+
+### 5.1 DC-Arbeitspunkt (`-OP`)
+Für den DC-Arbeitspunkt gilt `h = 0.0`. Kondensatoren werden als offene Leitungen (`Geq = 1e-12` S) und Spulen als Kurzschlüsse (`Req = 0.0` Ohm) modelliert. Die MNA-Gleichung wird einmalig gelöst.
+
+### 5.2 Transientenanalyse (`-TRAN`)
+1. **Initialisierung**: Zuerst wird der DC-Arbeitspunkt bei `t = 0` gelöst. Aus dieser Lösung werden die Anfangszustände `v_C(0)` und `i_L(0)` für alle Kondensatoren und Spulen extrahiert.
+2. **Kopfzeile schreiben**: Die CSV-Datei wird geöffnet und die Kopfzeilen (`Time`, Knotenspannungen, Bauelementeströme) sortiert geschrieben.
+3. **Anfangszustand schreiben**: Die berechneten DC-Werte bei `t = 0` werden in die CSV eingetragen.
+4. **Zeitschleife**: Von `t = TStart + TStep` bis `TStop` wird in Schritten von `h = TStep` berechnet:
+   * Die Systemmatrix `A` und der Vektor `B` werden vollständig geleert und neu gestempelt (unter Einbeziehung der aktuellen Zeit `t` für transiente Quellen und der Schrittweite `h` für `C` und `L`).
+   * Das System wird gelöst mit `LinEq(A, B, 1, Dim, Det)`.
+   * Die neuen Kondensatorspannungen und Spulenströme werden für den nächsten Schritt gespeichert.
+   * Der Zeitschritt wird als Datenzeile in die CSV geschrieben.
+
+---
+
+## 6. CSV-Exportformat (Transient)
+
+Die transiente CSV-Datei enthält eine Kopfzeile mit allen Knotenspannungen (alphabetisch sortiert) und allen Zweigströmen durch sämtliche Bauelemente (ebenfalls alphabetisch sortiert):
+
+```csv
+Time,V(1),V(2),V(3),I(C1),I(L1),I(R1),I(V1)
+0,0,0,0,0,0,0,0
+0.00001,0.31395,0.31084,0.00031,0.00031,0.00031,0.00031,-0.00031
+0.00002,0.62666,0.61739,0.00123,0.00092,0.00092,0.00092,-0.00092
+```
+
+---
+
+## 7. Kompilierung und Ausführung
+
+### Kompilieren via Lazarus CLI
+Da das Projekt eine Lazarus-Projektdatei besitzt, kann es plattformunabhängig und ohne manuelle Pfadkonfiguration compiliert werden:
+```bash
+lazbuild DGS_SPICE.lpi
+```
+
+### Ausführen einer Simulation
+Die Ausführung erfolgt unter Angabe der Netzlistendatei. Die Art der Simulation wird über Steuerbefehle (.op, .tran, .ac) am Ende der Netzliste bestimmt:
+```bash
+./DGS_SPICE rc_pulse.cir
+```
+
+#### Unterstützte Analyse-Steuerbefehle:
+* **`.op`**: Führt eine DC-Arbeitspunkt-Analyse (Operational Point) durch. Dies ist der Standardmodus, falls kein Steuerbefehl angegeben wird.
+* **`.tran <Tstep> <Tstop> [<Tstart>]`**: Führt eine Transientenanalyse (Zeitbereichssimulation) durch. Die Ergebnisse werden standardmäßig in eine CSV-Datei exportiert (z. B. `rc_pulse.csv`).
+  * **`Tstep`**: Die Zeitschrittweite der transienten Simulation (z. B. `10u` = $10\,\mu\text{s}$). Dieser Wert bestimmt das Intervall `h` zwischen aufeinanderfolgenden Berechnungen und somit die Genauigkeit der Ergebnisse.
+  * **`Tstop`**: Die Simulationsendzeit (z. B. `5m` = $5\,\text{ms}$). Die Zeitintegrationsschleife stoppt, sobald dieser Wert erreicht ist.
+  * **`Tstart`** *(optional)*: Die Zeit, ab der die Simulationsergebnisse in die CSV-Datei exportiert werden sollen. Die Berechnung startet immer ab $t=0$ (um Einschwingvorgänge zu berücksichtigen), aber das Schreiben der Zeilen in die CSV-Datei beginnt erst ab `Tstart` (Standardwert: `0.0`).
+* **`.ac`**: Führt eine AC-Wechselstromanalyse durch (derzeit noch nicht implementiert; gibt Fehlermeldung und Exit-Code `3` aus).
+

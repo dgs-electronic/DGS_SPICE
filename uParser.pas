@@ -5,7 +5,7 @@ unit uParser;
 interface
 
 uses
-  SysUtils, Classes, StrUtils, uComponents, uCircuit;
+  SysUtils, Classes, StrUtils, Generics.Collections, uComponents, uCircuit;
 
 { Parses a SPICE netlist file and returns a TCircuit object }
 function ParseNetlist(const AFilename: string): TCircuit;
@@ -131,15 +131,159 @@ begin
   Result := ValDouble * Scale;
 end;
 
+function ParseSourceFunction(const AFuncStr: string): TSourceFunction;
+var
+  FuncStr, UpperStr, ArgsStr: string;
+  OpenParen, CloseParen: Integer;
+  Args: TStringArray;
+  i, count: Integer;
+  Filename: string;
+  FileLines: TStringList;
+  LineParts: TStringArray;
+  LineIdx: Integer;
+  PairList: TList<TPwlPoint>;
+  Point: TPwlPoint;
+begin
+  Result := TSourceFunction.Create;
+  FuncStr := Trim(AFuncStr);
+  UpperStr := UpperCase(FuncStr);
+  
+  if StartsText('PULSE', UpperStr) then
+  begin
+    Result.FuncType := ftPulse;
+    OpenParen := Pos('(', FuncStr);
+    CloseParen := LastDelimiter(')', FuncStr);
+    if (OpenParen > 0) and (CloseParen > OpenParen) then
+      ArgsStr := Copy(FuncStr, OpenParen + 1, CloseParen - OpenParen - 1)
+    else
+      ArgsStr := '';
+      
+    ArgsStr := ReplaceStr(ArgsStr, ',', ' ');
+    Args := SplitWhitespace(ArgsStr);
+    
+    count := Length(Args);
+    if count >= 1 then Result.V1 := ParseSpiceValue(Args[0]);
+    if count >= 2 then Result.V2 := ParseSpiceValue(Args[1]);
+    if count >= 3 then Result.TD := ParseSpiceValue(Args[2]);
+    if count >= 4 then Result.TR := ParseSpiceValue(Args[3]);
+    if count >= 5 then Result.TF := ParseSpiceValue(Args[4]);
+    if count >= 6 then Result.PW := ParseSpiceValue(Args[5]);
+    if count >= 7 then Result.PER := ParseSpiceValue(Args[6]);
+    if count >= 8 then Result.Ncycles := ParseSpiceValue(Args[7]);
+  end
+  else if StartsText('SINE', UpperStr) or StartsText('SIN', UpperStr) then
+  begin
+    Result.FuncType := ftSine;
+    OpenParen := Pos('(', FuncStr);
+    CloseParen := LastDelimiter(')', FuncStr);
+    if (OpenParen > 0) and (CloseParen > OpenParen) then
+      ArgsStr := Copy(FuncStr, OpenParen + 1, CloseParen - OpenParen - 1)
+    else
+      ArgsStr := '';
+      
+    ArgsStr := ReplaceStr(ArgsStr, ',', ' ');
+    Args := SplitWhitespace(ArgsStr);
+    
+    count := Length(Args);
+    if count >= 1 then Result.VO := ParseSpiceValue(Args[0]);
+    if count >= 2 then Result.VA := ParseSpiceValue(Args[1]);
+    if count >= 3 then Result.FREQ := ParseSpiceValue(Args[2]);
+    if count >= 4 then Result.TD := ParseSpiceValue(Args[3]);
+    if count >= 5 then Result.THETA := ParseSpiceValue(Args[4]);
+    if count >= 6 then Result.PHI := ParseSpiceValue(Args[5]);
+    if count >= 7 then Result.Ncycles := ParseSpiceValue(Args[6]);
+  end
+  else if StartsText('PWL', UpperStr) then
+  begin
+    Result.FuncType := ftPwl;
+    
+    if ContainsText(UpperStr, 'FILE') then
+    begin
+      Filename := FuncStr;
+      Filename := ReplaceText(Filename, 'PWL', '');
+      Filename := ReplaceText(Filename, 'pwl', '');
+      Filename := ReplaceText(Filename, 'FILE', '');
+      Filename := ReplaceText(Filename, 'file', '');
+      Filename := ReplaceText(Filename, '(', '');
+      Filename := ReplaceText(Filename, ')', '');
+      Filename := ReplaceText(Filename, '=', '');
+      Filename := ReplaceText(Filename, '"', '');
+      Filename := ReplaceText(Filename, '''', '');
+      Filename := Trim(Filename);
+      
+      if not FileExists(Filename) then
+        raise Exception.CreateFmt('PWL file "%s" not found.', [Filename]);
+        
+      FileLines := TStringList.Create;
+      PairList := TList<TPwlPoint>.Create;
+      try
+        FileLines.LoadFromFile(Filename);
+        for LineIdx := 0 to FileLines.Count - 1 do
+        begin
+          ArgsStr := Trim(FileLines[LineIdx]);
+          if (ArgsStr = '') or (ArgsStr[1] = ';') or (ArgsStr[1] = '*') or (ArgsStr[1] = '#') then
+            Continue;
+            
+          ArgsStr := ReplaceStr(ArgsStr, ',', ' ');
+          ArgsStr := ReplaceStr(ArgsStr, ':', ' ');
+          LineParts := SplitWhitespace(ArgsStr);
+          if Length(LineParts) >= 2 then
+          begin
+            Point.Time := ParseSpiceValue(LineParts[0]);
+            Point.Value := ParseSpiceValue(LineParts[1]);
+            PairList.Add(Point);
+          end;
+        end;
+        
+        SetLength(Result.PwlPoints, PairList.Count);
+        for i := 0 to PairList.Count - 1 do
+          Result.PwlPoints[i] := PairList[i];
+      finally
+        PairList.Free;
+        FileLines.Free;
+      end;
+    end
+    else
+    begin
+      OpenParen := Pos('(', FuncStr);
+      CloseParen := LastDelimiter(')', FuncStr);
+      if (OpenParen > 0) and (CloseParen > OpenParen) then
+        ArgsStr := Copy(FuncStr, OpenParen + 1, CloseParen - OpenParen - 1)
+      else
+        ArgsStr := Copy(FuncStr, 4, Length(FuncStr) - 3);
+        
+      ArgsStr := ReplaceStr(ArgsStr, ',', ' ');
+      Args := SplitWhitespace(ArgsStr);
+      
+      count := Length(Args) div 2;
+      if count = 0 then
+        raise Exception.Create('PWL function has no time-value pairs.');
+        
+      SetLength(Result.PwlPoints, count);
+      for i := 0 to count - 1 do
+      begin
+        Result.PwlPoints[i].Time := ParseSpiceValue(Args[2 * i]);
+        Result.PwlPoints[i].Value := ParseSpiceValue(Args[2 * i + 1]);
+      end;
+    end;
+  end
+  else
+  begin
+    raise Exception.CreateFmt('Unknown source function: "%s"', [FuncStr]);
+  end;
+end;
+
 function ParseNetlist(const AFilename: string): TCircuit;
 var
   Circuit: TCircuit;
   Lines: TStringList;
   Line: string;
   Parts: TStringArray;
-  CompName, Node1, Node2, ValStr: string;
-  Val: Double;
-  i: Integer;
+  CompName, Node1, Node2, FuncStr: string;
+  Val, Val2, Val3: Double;
+  i, j: Integer;
+  SourceFunc: TSourceFunction;
+  HasFunc: Boolean;
 begin
   Circuit := TCircuit.Create;
   Lines := TStringList.Create;
@@ -162,9 +306,46 @@ begin
       if (Line = '') or (Line[1] = '*') then
         Continue;
 
-      // Also skip control cards starting with '.' for now (like .op, .tran etc.)
+      // Parse control cards
       if Line[1] = '.' then
+      begin
+        if StartsText('.TRAN', Line) then
+        begin
+          Parts := SplitWhitespace(Line);
+          if Length(Parts) < 3 then
+          begin
+            Circuit.Free;
+            raise Exception.CreateFmt('Error on line %d: Invalid .tran command. Expected: .tran <Tstep> <Tstop> [<Tstart>]', [i + 1]);
+          end;
+          try
+            Val := ParseSpiceValue(Parts[1]); // TStep
+            Val2 := ParseSpiceValue(Parts[2]); // TStop
+            if Length(Parts) >= 4 then
+              Val3 := ParseSpiceValue(Parts[3])
+            else
+              Val3 := 0.0;
+            Circuit.TStep := Val;
+            Circuit.TStop := Val2;
+            Circuit.TStart := Val3;
+            Circuit.HasTran := True;
+          except
+            on E: Exception do
+            begin
+              Circuit.Free;
+              raise Exception.CreateFmt('Error parsing .tran on line %d: %s', [i + 1, E.Message]);
+            end;
+          end;
+        end
+        else if StartsText('.OP', Line) then
+        begin
+          Circuit.HasOp := True;
+        end
+        else if StartsText('.AC', Line) then
+        begin
+          Circuit.HasAc := True;
+        end;
         Continue;
+      end;
 
       Parts := SplitWhitespace(Line);
       if Length(Parts) < 4 then
@@ -173,22 +354,72 @@ begin
       CompName := Parts[0];
       Node1 := Parts[1];
       Node2 := Parts[2];
-      ValStr := Parts[3];
+      
+      Val := 0.0;
+      SourceFunc := nil;
+      HasFunc := False;
 
-      try
-        Val := ParseSpiceValue(ValStr);
-      except
-        on E: Exception do
+      // Special parsing for V and I sources which can have transient functions
+      if (UpCase(CompName[1]) = 'V') or (UpCase(CompName[1]) = 'I') then
+      begin
+        FuncStr := '';
+        for j := 3 to Length(Parts) - 1 do
         begin
-          Circuit.Free;
-          raise Exception.CreateFmt('Error on line %d: %s', [i + 1, E.Message]);
+          if j > 3 then FuncStr := FuncStr + ' ';
+          FuncStr := FuncStr + Parts[j];
+        end;
+        FuncStr := Trim(FuncStr);
+
+        try
+          Val := ParseSpiceValue(Parts[3]);
+          if Length(Parts) > 4 then
+          begin
+            FuncStr := '';
+            for j := 4 to Length(Parts) - 1 do
+            begin
+              if j > 4 then FuncStr := FuncStr + ' ';
+              FuncStr := FuncStr + Parts[j];
+            end;
+            FuncStr := Trim(FuncStr);
+            HasFunc := (FuncStr <> '');
+          end;
+        except
+          HasFunc := (FuncStr <> '');
+          Val := 0.0;
+        end;
+
+        if HasFunc then
+        begin
+          try
+            SourceFunc := ParseSourceFunction(FuncStr);
+            if Val = 0.0 then
+              Val := SourceFunc.Evaluate(0.0);
+          except
+            on E: Exception do
+            begin
+              Circuit.Free;
+              raise Exception.CreateFmt('Error parsing function on line %d: %s', [i + 1, E.Message]);
+            end;
+          end;
+        end;
+      end
+      else
+      begin
+        try
+          Val := ParseSpiceValue(Parts[3]);
+        except
+          on E: Exception do
+          begin
+            Circuit.Free;
+            raise Exception.CreateFmt('Error on line %d: %s', [i + 1, E.Message]);
+          end;
         end;
       end;
 
       case UpCase(CompName[1]) of
         'R': Circuit.AddComponent(TResistor.Create(CompName, Node1, Node2, Val));
-        'V': Circuit.AddComponent(TVoltageSource.Create(CompName, Node1, Node2, Val));
-        'I': Circuit.AddComponent(TCurrentSource.Create(CompName, Node1, Node2, Val));
+        'V': Circuit.AddComponent(TVoltageSource.Create(CompName, Node1, Node2, Val, SourceFunc));
+        'I': Circuit.AddComponent(TCurrentSource.Create(CompName, Node1, Node2, Val, SourceFunc));
         'C': Circuit.AddComponent(TCapacitor.Create(CompName, Node1, Node2, Val));
         'L': Circuit.AddComponent(TInductor.Create(CompName, Node1, Node2, Val));
         else
