@@ -61,7 +61,22 @@ Eine Spannungsquelle mit Spannung $V$ zwischen Knoten $n_1$ (positiv) und $n_2$ 
 * $A[V_{idx}, n_2] \mathrel{-}= 1.0$
 * $B[V_{idx}] \mathrel{+}= V$
 
-*Hinweis: Stempel-Operationen, die sich auf den Masse-Knoten (`0` oder `GND`) beziehen, werden in der Matrix ignorert (da das Massepotential als bekannt vorausgesetzt und zu $0\text{V}$ definiert ist).*
+#### 4. Kapazität (`TCapacitor`)
+Eine Kapazität verhält sich im DC-Fall wie ein Leerlauf (offene Verbindung). Um singuläre Matrizen zu vermeiden, wird sie mit einer minimalen Leitfähigkeit ($g = 10^{-12}$ S) gestempelt:
+* $A[n_1, n_1] \mathrel{+}= 10^{-12}$
+* $A[n_1, n_2] \mathrel{-}= 10^{-12}$
+* $A[n_2, n_1] \mathrel{-}= 10^{-12}$
+* $A[n_2, n_2] \mathrel{+}= 10^{-12}$
+
+#### 5. Spule (`TInductor`)
+Eine Spule verhält sich im DC-Fall wie ein Kurzschluss (Widerstand $R = 0$). Sie wird genau wie eine $0\text{V}$-Spannungsquelle gestempelt (inkl. einer neuen Zweigstromvariable bei Index $V_{idx}$):
+* $A[n_1, V_{idx}] \mathrel{+}= 1.0$
+* $A[n_2, V_{idx}] \mathrel{-}= 1.0$
+* $A[V_{idx}, n_1] \mathrel{+}= 1.0$
+* $A[V_{idx}, n_2] \mathrel{-}= 1.0$
+* $B[V_{idx}] \mathrel{+}= 0.0$
+
+*Hinweis: Stempel-Operationen, die sich auf den Masse-Knoten (`0` oder `GND`) beziehen, werden in der Matrix ignoriert (da das Massepotential als bekannt vorausgesetzt und zu $0\text{V}$ definiert ist).*
 
 ### Stromberechnung nach der Simulation
 
@@ -85,6 +100,14 @@ $$I_V = I_{vsource\_solved}$$
 #### 3. Unabhängige Stromquelle (`TCurrentSource`)
 Der Strom durch die Stromquelle ist eingeprägt und entspricht stets ihrem Nennwert:
 $$I_I = I_{source}$$
+
+#### 4. Kapazität (`TCapacitor`)
+Der DC-Strom durch eine Kapazität ist im eingeschwungenen Zustand stets null:
+$$I_C = 0.0$$
+
+#### 5. Spule (`TInductor`)
+Der Strom durch die Spule entspricht dem durch die MNA-Gleichung bestimmten Wert:
+$$I_L = I_{inductor\_solved}$$
 
 ---
 
@@ -137,9 +160,16 @@ fpc -vm4046 -Mdelphi -Fulmath/lmGenMath -Fulmath/lmLinearAlgebra -O2 DGS_SPICE.l
 ```
 
 ### Ausführen
+Standardmäßig wird eine DC-Arbeitspunkt-Analyse durchgeführt. Die Analyseart kann jedoch explizit über Parameter gesteuert werden:
+
 ```bash
-./DGS_SPICE divider.cir
+./DGS_SPICE divider.cir -OP
 ```
+
+#### Unterstützte Analyse-Parameter:
+* **`-OP`**: Führt eine DC-Arbeitspunkt-Analyse (Operational Point) durch. Dies ist der Standardmodus.
+* **`-TRAN`**: Transientenanalyse (Zeitbereichssimulation). Derzeit noch nicht implementiert (gibt Fehlermeldung und Exit-Code `3` aus).
+* **`-AC`**: AC-Frequenzgang-Analyse. Derzeit noch nicht implementiert (gibt Fehlermeldung und Exit-Code `3` aus).
 
 ### CSV-Export
 Über den optionalen Kommandozeilenparameter `--csv` können die berechneten Knotenspannungen und Ströme in eine tabellarische CSV-Datei exportiert werden:

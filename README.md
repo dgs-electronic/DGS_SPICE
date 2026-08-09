@@ -7,6 +7,8 @@ Der Simulator unterstützt in dieser Phase die **lineare DC-Analyse (Gleichstrom
 * Widerständen (`R`)
 * Unabhängigen Spannungsquellen (`V`)
 * Unabhängigen Stromquellen (`I`)
+* Kapazitäten (`C`) (als Leerlauf modelliert)
+* Spulen (`L`) (als Kurzschluss modelliert)
 
 Zusätzlich wurden folgende Komfortfunktionen implementiert:
 * **Stromberechnung für alle Komponenten**: Berechnung und tabellarische Ausgabe der Ströme durch alle Bauelemente (nicht nur Spannungsquellen).
@@ -40,10 +42,20 @@ Stelle sicher, dass der Free Pascal Compiler (`fpc`) auf deinem System installie
 fpc -Mdelphi -Fulmath/lmGenMath -Fulmath/lmLinearAlgebra -O2 DGS_SPICE.lpr
 ```
 
-Führe die Simulation einer Netzliste aus:
+Führe die Simulation einer Netzliste aus (standardmäßig wird eine DC-Arbeitspunkt-Analyse `-OP` durchgeführt):
 
 ```bash
 ./DGS_SPICE bridge.cir
+```
+
+Um einen bestimmten Analysetyp explizit anzugeben, können die folgenden Parameter verwendet werden:
+- `-OP`: DC-Arbeitspunkt-Analyse (vollständig unterstützt)
+- `-TRAN`: Transientenanalyse (in Vorbereitung)
+- `-AC`: AC-Frequenzanalyse (in Vorbereitung)
+
+Beispiel für den Aufruf der Arbeitspunkt-Analyse:
+```bash
+./DGS_SPICE bridge.cir -OP
 ```
 
 Um die Simulationsergebnisse als CSV-Datei zu exportieren, kann der optionale Parameter `--csv` verwendet werden:

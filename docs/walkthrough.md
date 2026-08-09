@@ -92,3 +92,54 @@ Ausgabe des Simulators:
   - Der Strom durch $V_1$ beträgt $-8{,}727\text{ mA}$ und gleicht der Summe der Ströme in $R_1$ und $R_2$ ($3{,}273\text{ mA} + 5{,}455\text{ mA} = 8{,}728\text{ mA}$).
   - Kirchhoffsches Knotengesetz (KCL) an Knoten 2: $-I(R_1) + I(R_3) + I(R_5) = -3{,}273\text{ mA} + 5{,}455\text{ mA} - 2{,}182\text{ mA} = 0$.
   - Alle Werte sind konsistent und korrekt. **Erfolg.**
+
+---
+
+### Test 3: Spulen- und Kondensatortest (`lc_test.cir`)
+Netzliste:
+```spice
+* LC Test Circuit
+V1 1 0 10
+R1 1 2 1k
+C1 2 0 10u
+L1 2 3 10m
+R2 3 0 1k
+```
+
+Ausgabe des Simulators (mit `--show-matrix`):
+```text
+Lese Netzliste ein: lc_test.cir
+Berechne Arbeitspunkt...
+
+--- Systemgleichungen (MNA-Matrix) ---
+                      V(1)          V(2)          V(3)         I(V1)         I(L1)       B-Vektor
+KCL(1)      [     0.001000,    -0.001000,     0.000000,     1.000000,     0.000000 ] = [     0.000000 ]
+KCL(2)      [    -0.001000,     0.001000,     0.000000,     0.000000,     1.000000 ] = [     0.000000 ]
+KCL(3)      [     0.000000,     0.000000,     0.001000,     0.000000,    -1.000000 ] = [     0.000000 ]
+Eq(V1)      [     1.000000,     0.000000,     0.000000,     0.000000,     0.000000 ] = [    10.000000 ]
+Eq(L1)      [     0.000000,     1.000000,    -1.000000,     0.000000,     0.000000 ] = [     0.000000 ]
+
+
+========================================
+          SIMULATIONSERGEBNISSE
+========================================
+--- Knotenspannungen ---
+  V(0)    =     0.000000 V
+  V(1)    =    10.000000 V
+  V(2)    =     5.000000 V
+  V(3)    =     5.000000 V
+  V(GND)    =     0.000000 V
+
+--- Stroeme durch alle Komponenten ---
+  I(C1)    =     0.000000 A
+  I(L1)    =     0.005000 A
+  I(R1)    =     0.005000 A
+  I(R2)    =     0.005000 A
+  I(V1)    =    -0.005000 A
+========================================
+```
+* **Verifikation:**
+  - Im DC-Zustand verhält sich der Kondensator $C_1$ als Leerlauf (offene Verbindung), daher fließt durch $C_1$ kein Strom ($I(C_1) = 0\text{ A}$).
+  - Die Spule $L_1$ verhält sich als Kurzschluss (Widerstand $0\ \Omega$), wodurch $V(2) = V(3) = 5\text{ V}$ erzwungen wird.
+  - Das verbleibende System entspricht einem einfachen Spannungsteiler aus $R_1$ ($1\text{k}$) und $R_2$ ($1\text{k}$) in Serie an der $10\text{V}$-Spannungsquelle. Der Strom beträgt $I = \frac{10\text{V}}{1\text{k} + 1\text{k}} = 5\text{ mA}$.
+  - Alle Ströme und Knotenspannungen sind mathematisch und physikalisch korrekt. **Erfolg.**

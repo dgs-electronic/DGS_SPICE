@@ -82,7 +82,7 @@ begin
   begin
     RegisterNode(Comp.Node1);
     RegisterNode(Comp.Node2);
-    if Comp is TVoltageSource then
+    if (Comp is TVoltageSource) or (Comp is TInductor) then
       Inc(FVSourceCount);
   end;
 end;
@@ -130,7 +130,7 @@ begin
   VIdx := NActiveNodes; // Row index for voltage sources starts after active nodes
   for Comp in FComponents do
   begin
-    if Comp is TVoltageSource then
+    if (Comp is TVoltageSource) or (Comp is TInductor) then
     begin
       Inc(VIdx);
       Comp.Stamp(A, B, FNodeMap, VIdx);
@@ -157,7 +157,7 @@ begin
     VIdx := NActiveNodes;
     for Comp in FComponents do
     begin
-      if Comp is TVoltageSource then
+      if (Comp is TVoltageSource) or (Comp is TInductor) then
       begin
         Inc(VIdx);
         VarNames[VIdx] := 'I(' + Comp.Name + ')';
@@ -211,7 +211,7 @@ begin
     VIdx := NActiveNodes;
     for Comp in FComponents do
     begin
-      if Comp is TVoltageSource then
+      if (Comp is TVoltageSource) or (Comp is TInductor) then
       begin
         Inc(VIdx);
         ComponentCurrents.Add(Comp.Name, Comp.GetCurrent(NodeVoltages, B[VIdx]));

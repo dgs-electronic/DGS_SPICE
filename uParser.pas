@@ -189,9 +189,10 @@ begin
         'R': Circuit.AddComponent(TResistor.Create(CompName, Node1, Node2, Val));
         'V': Circuit.AddComponent(TVoltageSource.Create(CompName, Node1, Node2, Val));
         'I': Circuit.AddComponent(TCurrentSource.Create(CompName, Node1, Node2, Val));
+        'C': Circuit.AddComponent(TCapacitor.Create(CompName, Node1, Node2, Val));
+        'L': Circuit.AddComponent(TInductor.Create(CompName, Node1, Node2, Val));
         else
-          // Ignore other components for now (e.g. C, L, D, Q etc. in Phase 1)
-          Writeln('Warning: Component ', CompName, ' ignored (Phase 1 supports R, V, I).');
+          Writeln('Warning: Component ', CompName, ' ignored.');
       end;
     end;
   finally

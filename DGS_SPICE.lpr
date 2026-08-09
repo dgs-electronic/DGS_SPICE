@@ -5,11 +5,18 @@ program DGS_SPICE;
 uses
   SysUtils, Classes, Generics.Collections, uCircuit, uParser;
 
+type
+  TAnalysisMode = (amOP, amTRAN, amAC);
+
 procedure ShowUsage;
 begin
   Writeln('DGS-SPICE Simulator - Phase 1 (Gleichstrom-Arbeitspunkt)');
-  Writeln('Usage: DGS_SPICE <Netzliste.cir> [--csv <Output-Datei>] [--show-matrix]');
-  Writeln('Options:');
+  Writeln('Usage: DGS_SPICE <Netzliste.cir> [Analysetyp] [--csv <Output-Datei>] [--show-matrix]');
+  Writeln('Analysetypen:');
+  Writeln('  -OP                    DC-Arbeitspunkt-Analyse (Standard)');
+  Writeln('  -TRAN                  Transientenanalyse (Zeitbereich - noch nicht implementiert)');
+  Writeln('  -AC                    AC-Wechselstromanalyse (Frequenzbereich - noch nicht implementiert)');
+  Writeln('Optionen:');
   Writeln('  --csv <Output-Datei>   Speichert die Simulationsergebnisse als CSV-Datei ab.');
   Writeln('  --show-matrix          Zeigt die Systemmatrizen des Gleichungssystems an.');
   Writeln;
@@ -130,6 +137,7 @@ var
   Success: Boolean;
   ArgIdx: Integer;
   ShowMatrix: Boolean;
+  AnalysisMode: TAnalysisMode;
 begin
   if ParamCount < 1 then
   begin
@@ -141,6 +149,7 @@ begin
   Filename := '';
   CsvFilename := '';
   ShowMatrix := False;
+  AnalysisMode := amOP; // Default to OP
 
   ArgIdx := 1;
   while ArgIdx <= ParamCount do
@@ -165,6 +174,21 @@ begin
       ShowMatrix := True;
       Inc(ArgIdx);
     end
+    else if (UpperCase(ParamStr(ArgIdx)) = '-OP') then
+    begin
+      AnalysisMode := amOP;
+      Inc(ArgIdx);
+    end
+    else if (UpperCase(ParamStr(ArgIdx)) = '-TRAN') then
+    begin
+      AnalysisMode := amTRAN;
+      Inc(ArgIdx);
+    end
+    else if (UpperCase(ParamStr(ArgIdx)) = '-AC') then
+    begin
+      AnalysisMode := amAC;
+      Inc(ArgIdx);
+    end
     else
     begin
       if Filename = '' then
@@ -177,6 +201,22 @@ begin
         Exit;
       end;
       Inc(ArgIdx);
+    end;
+  end;
+
+  // Handle analysis modes that are not yet implemented
+  case AnalysisMode of
+    amTRAN:
+    begin
+      Writeln('Fehler: Transientenanalyse (-TRAN) ist noch nicht implementiert.');
+      ExitCode := 3;
+      Exit;
+    end;
+    amAC:
+    begin
+      Writeln('Fehler: AC-Analyse (-AC) ist noch nicht implementiert.');
+      ExitCode := 3;
+      Exit;
     end;
   end;
 

@@ -1,0 +1,6 @@
+* LC Test Circuit
+V1 1 0 10
+R1 1 2 1k
+C1 2 0 10u
+L1 2 3 10m
+R2 3 0 1k

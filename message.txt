@@ -1,0 +1,23 @@
+feat: Add branch currents, CSV export, MNA matrix visualization, L/C support, and simulation mode CLI options
+
+- uComponents.pas:
+  - Add `GetCurrent` method to `TComponent` base class.
+  - Implement `GetCurrent` for `TResistor` (Ohm's law), `TVoltageSource` (solved MNA branch current), and `TCurrentSource` (nominal current).
+  - Implement `TCapacitor` class (DC model as open-circuit with 1e-12 S shunt conductance).
+  - Implement `TInductor` class (DC model as short circuit / 0V voltage source).
+
+- uCircuit.pas:
+  - Return all component currents in `Solve` via `ComponentCurrents` parameter.
+  - Support `TInductor` branch current variables in `BuildNodeMap` and `Solve`.
+  - Format `--show-matrix` output to label columns with node voltages/current variables and rows with KCL/voltage equations.
+
+- uParser.pas:
+  - Add parsing support for `C` and `L` components.
+
+- DGS_SPICE.lpr:
+  - Parse CLI parameter `--csv <file>` and save results using `SaveResultsToCsv` with full precision.
+  - Parse CLI parameter `--show-matrix` and pass it to the solver.
+  - Parse CLI parameters `-OP`, `-TRAN`, and `-AC` to select the analysis mode. Default is `-OP`. Return exit code 3 and print error for unimplemented `-TRAN` and `-AC`.
+
+- docs/ & README.md:
+  - Update all documentation files (README.md, docs/documentation.md, docs/walkthrough.md) to reflect the new CLI parameters, models, and output format.
