@@ -21,3 +21,7 @@ feat: Add branch currents, CSV export, MNA matrix visualization, L/C support, an
 
 - docs/ & README.md:
   - Update all documentation files (README.md, docs/documentation.md, docs/walkthrough.md) to reflect the new CLI parameters, models, and output format.
+  - Add AI Attribution section to README.md.
+
+- .agents/AGENTS.md:
+  - Add project rule requiring AI Attribution section in README.md.

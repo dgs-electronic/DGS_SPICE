@@ -69,3 +69,8 @@ Um die Matrizen des aufgestellten Gleichungssystems ($A$ und $B$) anzuzeigen, ka
 ```bash
 ./DGS_SPICE bridge.cir --show-matrix
 ```
+
+## Entwicklungsunterstützung (KI)
+
+Dieses Projekt wurde mit Unterstützung der folgenden künstlichen Intelligenz(en) entwickelt:
+* **Antigravity (Google DeepMind)**: Assistenz bei Konzeptionierung, Implementierung der MNA-Matrixstempel, CLI-Parameter-Erweiterungen, Verifikation und Dokumentation.
